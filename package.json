@@ -1,0 +1,23 @@
+{
+  "name": "@gabriel-operator/gabriel-operator-skills",
+  "version": "1.0.0",
+  "description": "Gabriel Operator MCP gateway central skill — install with npx or curl",
+  "keywords": [
+    "gabriel-operator",
+    "mcp",
+    "gateway",
+    "skills",
+    "coding-agent"
+  ],
+  "license": "MIT",
+  "bin": {
+    "gabriel-operator-skills": "./cli.js"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Gabriel-Operator/gabriel-operator-skills.git"
+  }
+}
