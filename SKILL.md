@@ -160,7 +160,10 @@ curl -X POST https://gabrieloperator.com/api/gateway/sessions/<sessionId>/messag
 | `gabriel_update_data_list` | Patch metadata/schema fields for the session's data list. |
 | `gabriel_create_data_list` | Create a list and collection. Pass `pageId`. |
 | `gabriel_create_pipeline` | Create a pipeline/machine. Follow with `gabriel_update_pipeline_stages`. |
-| `gabriel_update_pipeline_stages` | Replace stages and transitions together. |
+| `gabriel_list_pipelines` | List pipelines (includes `transitionIds`). |
+| `gabriel_get_pipeline` | Inspect the live machine chat will execute. |
+| `gabriel_sync_pipeline_from_git` | Force-pull bound `assets/pipeline.json` into the live projection. |
+| `gabriel_update_pipeline_stages` | Replace stages and transitions together. `transitions` is required. Writes git when bound. |
 | `gabriel_initialize_page_git` | OAuth-backed page git binding + scaffold. |
 | `gabriel_initialize_list_git` | Bind a list repo. |
 | `gabriel_initialize_pipeline_git` | Bind a pipeline repo. |
@@ -295,17 +298,20 @@ Deep links the app honors:
 | Experience / output | `.../edit-persona/{pageId}?tab=output` |
 | Phone / inbox / chat apps | `.../edit-persona/{pageId}?tab=reach` (`&section=phone`, `inbox`, or `chat-integrations`) |
 | GitHub not connected | https://gabrieloperator.com/workspace/developer-settings |
+| Runner toolkit OAuth (Gmail, Sheets, Calendar) | https://gabrieloperator.com/workspace/ai-resources?pageId={pageId} then **Connected toolkits** |
 
-There is no `?section=mcp` deep link. For Composio, send `tab=simulated-world`
-and tell them to expand **MCP connectors**.
+There is no `?section=mcp` deep link. For Composio **keys**, send `tab=simulated-world`
+and tell them to expand **MCP connectors**. For app **Connect** (OAuth), send the
+AI Resources URL — not Edit Persona.
 
 ### When to use this
 
 - Saving Composio, Arcade, Nango, or Scalekit keys (profile keys, not Gateway)
 - Connecting GitHub (`GITHUB_NOT_CONNECTED`)
+- Runner app OAuth (Gmail, Sheets, Calendar) on **AI Resources → Connected toolkits**
 - Voice/provider BYOK, computer providers, or other credential UIs
 - Any configure field with no matching `gabriel_*` tool
-- OAuth / “open this site and approve” flows
+- GitHub OAuth / “open Developer Settings and approve” flows
 
 ### Composio keys (common case)
 
@@ -315,9 +321,24 @@ Gateway cannot create the Composio API key. The user must do it in the UI:
    https://gabrieloperator.com/workspace/edit-persona/{pageId}?tab=simulated-world
 2. Or open the persona page and click **Configure**.
 3. On the **Tools** tab, expand **MCP connectors**.
-4. Choose **Composio**, add a key (label + API key), save, then enable the
+4. Choose **Composio**, add a key (label + API key), Save, then enable the
    toolkits they need.
-5. After they confirm it is saved, continue with MCP/REST.
+5. After they confirm the key is saved and those toolkits are enabled,
+   continue with MCP/REST.
+
+Do **not** ask them to Connect Gmail, Sheets, Calendar, or any other app on
+**Edit Persona / Tools**. Enabling a toolkit there only publishes which apps
+the persona may use.
+
+**Connect accounts on this persona's AI Resources page.** From chat, click
+**Connect** or **Connected** (not Configure), or open
+https://gabrieloperator.com/workspace/ai-resources?pageId={pageId}.
+On **Connected toolkits**, click **Connect** on each card and finish OAuth.
+Canvas then uses those same connections. They can also Connect when a canvas
+stage asks. Connecting only in the Composio dashboard does not count.
+
+Screenshot:
+https://gabrieloperator.com/assets/docs/ai-resources-connected-toolkits.jpg
 
 Give the full `https://` URL. Name the tab and the control. Wait, then retry.
 Never print or store the vendor secret.
