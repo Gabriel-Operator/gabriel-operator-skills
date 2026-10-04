@@ -7,10 +7,14 @@ description: >
   specialized git-backed skills.
 metadata:
   author: gabriel-operator
-  version: "1.2"
+  version: "1.3.1"
 ---
 
 # Gabriel Operator Gateway Skill
+
+## Offline-first environment
+
+Read [the embedded runtime contract](references/offline-runtime-v1.md) before choosing an API. Discover the active environment and its capability report first. In embedded local mode, use device repositories and local execution adapters; do not silently switch to the gateway when a step is blocked. Explain that synchronization is manual and identify which requested effects still need connectivity.
 
 ## Goal
 
@@ -31,6 +35,13 @@ but the gateway is the unified runtime/API entrypoint.
 To **create** a new AI Persona from a description (page, lists, pipeline,
 workflows, git, team agents, publish), use the `persona-builder` skill. Request
 it with `gabriel_get_skill_instructions` and topic `persona-builder`.
+
+To edit the Persona's semantic entity/attribute/relationship contract, request topic `persona-ontology` (alias `ontology`). It maintains the parent app's single `assets/ontology.json` and validates Data Feed references without migrating runtime rows or replacing state machines.
+
+To **deploy a published candidate to a local computer** (DGX Spark / RTX Linux),
+use topic `portable-persona-runtime` or install
+[`Gabriel-Operator/portable-persona-runtime`](https://github.com/Gabriel-Operator/portable-persona-runtime).
+That is the full local appliance path, not the prompt-only `persona-export` kit.
 
 ## Authentication
 
@@ -136,10 +147,10 @@ curl -X POST https://gabrieloperator.com/api/gateway/sessions/<sessionId>/messag
 | `gabriel_list_resources` | Discover AI Personas, AI operators, data lists, and recent assets. |
 | `gabriel_create_session` | Create a target-bound gateway session. |
 | `gabriel_run_twin` | Send a message to the session's AI Persona. |
-| `gabriel_update_twin_config` | Patch safe chat/config fields for the session's AI Persona. |
+| `gabriel_update_twin_config` | Patch safe chat/config fields for the session's AI Persona, including a complete validated Chat App and disabled portable Signal presets. |
 | `gabriel_create_page` | Create a new AI Persona page. |
 | `gabriel_publish_twin` | Publish an AI Persona. |
-| `gabriel_mint_persona_key` | Mint a persona-scoped `/api/v1` key (returned once). |
+| `gabriel_mint_persona_key` | Mint a Persona Token for `/api/v1` (returned once). |
 | `gabriel_setup_meetings` | Configure meeting notetaker settings for an AI Persona. |
 | `gabriel_join_meeting` | Invite an AI Persona's configured meeting notetaker to a meeting URL. |
 | `gabriel_list_meetings` | List recent meeting notetaker sessions for an AI Persona. |
@@ -158,7 +169,9 @@ curl -X POST https://gabrieloperator.com/api/gateway/sessions/<sessionId>/messag
 | `gabriel_run_canvas_playbook` | Replay a captured canvas playbook for an AI Persona. |
 | `gabriel_list_data_lists` | List workspace data lists, optionally for a page. |
 | `gabriel_update_data_list` | Patch metadata/schema fields for the session's data list. |
-| `gabriel_create_data_list` | Create a list and collection. Pass `pageId`. |
+| `gabriel_create_data_list` | Create a list and collection. Pass `pageId`. Schema only — seed rows with `gabriel_upsert_list_records`. |
+| `gabriel_upsert_list_records` | Insert or update live list rows. Pipeline lists stamp `_workflowState` (default: initial stage). |
+| `gabriel_get_list_records` | Read live list rows and their pipeline stage. |
 | `gabriel_create_pipeline` | Create a pipeline/machine. Follow with `gabriel_update_pipeline_stages`. |
 | `gabriel_list_pipelines` | List pipelines (includes `transitionIds`). |
 | `gabriel_get_pipeline` | Inspect the live machine chat will execute. |
@@ -170,11 +183,12 @@ curl -X POST https://gabrieloperator.com/api/gateway/sessions/<sessionId>/messag
 | `gabriel_initialize_workflow_git` | Bind one action's workflow repo (`actionId` required). |
 | `gabriel_create_team_agent` | Create a page-scoped event team-agent endpoint. |
 | `gabriel_initialize_team_agent_git` | Bind that endpoint to git and scaffold `team-agents`. |
-| `gabriel_promote_workspace` | Assign portable resource keys and write registry v2. |
+| `gabriel_promote_workspace` | Assign portable resource keys and write registry v2 (Workflow + Pipeline + List only). |
 | `gabriel_validate_workspace` | Validate the bundle — read `ok`, not HTTP status. |
 | `gabriel_publish_workspace` | Pin submodule revisions on the persona root. |
 | `gabriel_list_assets` | List generated media and external asset-library items. |
 | `gabriel_save_asset` | Save generated media or external URLs into the asset library. |
+| `gabriel_upload_asset` | Upload raw image bytes (`dataUrl`) and get back a hosted URL — e.g. for `profilePicture`/`bannerImage`. |
 | `gabriel_delete_asset` | Delete an asset owned by the token owner. |
 | `gabriel_get_skill_instructions` | Get central or specialized skill guidance (`persona-builder`, `digital-twin-page`, …). |
 
@@ -191,6 +205,50 @@ Session-bound runs and modifications must use a session id. Page-scoped tools
 that take `pageId` directly, including `gabriel_run_canvas_playbook`, do not
 require a gateway session.
 
+## Asset validation hook (recommended)
+
+Every Gabriel asset type ships a validator, and the skills tell you to run it before
+committing. That instruction is prose — it carries no execution guarantee, and a skipped
+validation surfaces much later, at `gabriel_validate_workspace`, at publish, or only when the
+bundle is imported into another environment. The most common casualty is an environment-local
+id (`pageId`, `listId`, `actionId`) written into a portable definition, which makes the
+persona unpublishable.
+
+This pack ships a `PostToolUse` hook that runs the matching validator automatically after you
+write a Gabriel asset:
+
+`skills/gabriel-operator/hooks/validate-gabriel-asset.js`
+
+It maps `assets/list.json`, `assets/pipeline.json`, `assets/todos.json`,
+`assets/embed-config.json`, `assets/persona-evals.json`, and the persona repo's
+`assets/chat-config.json` / `references/registry.json` to the right validator, prefers the
+copy checked into the repo you are editing, and exits 0 for anything it does not recognize.
+
+If your agent does not load `skills/gabriel-operator/hooks/hooks.json` automatically, register
+it once in Claude Code settings (`~/.claude/settings.json` or the project's
+`.claude/settings.json`):
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/skills/gabriel-operator/hooks/validate-gabriel-asset.js\""
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Point `command` at the absolute path of the script if `${CLAUDE_PLUGIN_ROOT}` is not set in
+your agent. The hook never edits files and never uses the network.
+
 ## AI Persona Rules
 
 Use `gabriel_run_twin` for persona chat, connected-tool use, and questions about
@@ -199,6 +257,14 @@ what the twin can do.
 Use `gabriel_update_twin_config` only when the user explicitly asks to change the
 twin configuration. This maps to the safe chat/config fields exposed by Gabriel's
 configuration UI. Do not attempt unrestricted database updates.
+
+When authoring Signals, update the complete validated `chatApp` definition. Put
+`signalPresets` only on its `provider: "automations"` workspace data point. Each
+preset is a disabled draft and may reference only a portable list resource key
+and a declared command action ID. The runner later configures, tests, enables,
+pauses, and inspects it through the persona-bound `persona_coach_*` app tools;
+never write runtime automation IDs, observations, history, credentials, or
+enabled state through the workspace Gateway.
 
 To provision a **new** persona from a description (lists, pipeline, workflows,
 git, team agents, publish), load topic `persona-builder` and follow that
@@ -245,6 +311,12 @@ asks to replay a captured canvas skill. Pass `pageId`, `playbookId`,
 from the parameter mapping. Use `full` with `chunkPrompts` to replay the pinned
 step prompts. Approval gates remain enabled for MCP launches.
 
+To **author** a form-fill / capture-and-fill Canvas slash command, load
+`workflow-builder` (Rule 4), `digital-twin-page`, and `pipeline-builder`. Collect
+is `channels_only`: runtime presents **Answer here**, **Talk**, and **Chat**, and
+prefills drafts from the List, signed-in profile, and `memoryConfig`. Do not add
+`in_app_chat` to `allowedChannels` or a prefill toggle to `chat-config.json`.
+
 ## Data List Rules
 
 Use `gabriel_list_data_lists` for discovery and `gabriel_update_data_list` for
@@ -261,6 +333,11 @@ Use `gabriel_list_assets` to search or inspect media assets.
 Use `gabriel_save_asset` only for durable generated media or external URLs the
 user wants to keep in Gabriel. Include `prompt`, `type`, and useful display
 metadata when available.
+
+Use `gabriel_upload_asset` when you have image bytes in hand (a generated
+image, an uploaded file) rather than an existing URL — it returns a hosted
+URL you can write into `pageProfile.profilePicture`/`bannerImage` or use
+anywhere else a URL is needed.
 
 Use `gabriel_delete_asset` only when the user clearly requests deletion.
 
@@ -352,3 +429,8 @@ Never print or store the vendor secret.
 - Do not claim an operation succeeded unless the gateway returned success.
 - Do not store prompt or request payload bodies in audit logs.
 - Use scoped sessions for every concrete action.
+
+## Persona mobile apps
+
+For model-owned native app configuration, branding and local or user-owned GitHub
+builds, request `gabriel_get_skill_instructions` with topic `mobile-app-builder`.
