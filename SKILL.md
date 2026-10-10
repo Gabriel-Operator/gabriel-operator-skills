@@ -434,3 +434,88 @@ Never print or store the vendor secret.
 
 For model-owned native app configuration, branding and local or user-owned GitHub
 builds, request `gabriel_get_skill_instructions` with topic `mobile-app-builder`.
+
+## Persona integration support
+
+Use `gabriel_list_integrations` to discover actual capabilities and workspace rollout status. `gabriel_test_integration` requires an existing digital-twin `sessionId` and owned `connectionId`. Configuration uses `gabriel_update_twin_config`; load skill topic `persona-integrations` for bindings, voice, and vision. Credentials are entered in the connection UI, never in chat or Git.
+
+## Persona app composition discovery
+
+When building or revising a signed-in Persona app, request child topics `chat-app-builder` and `persona-chat-app-layout` through `gabriel_get_skill_instructions` (REST: `/api/gateway/skill-instructions?topic=...`). Use a Home dashboard with a review-only Meet Persona coach and domain records/results/decisions, plus the standard minimal sidebar. Playbooks is sidebar-only, milestones/goals lives in Coach, and routines/Signals/Schedule lives in Signals. Never duplicate those as Home tabs or panels. Patch the complete validated `chatApp`, mirror `assets/chat-app.json` and `publishedConfig.chatApp`, then use workspace publication. Do not treat the public landing page or a slash command as the full authenticated app.
+
+## Context-aware ontology
+
+Use the parent persona’s `assets/ontology.json` for Global → country/region → one authenticated audience → language → terminology. Refer to [the ontology skill](../persona-ontology/SKILL.md) for snapshots, stable IDs, validation, preview and gateway/MCP authoring. Child resources reference that contract; stored instances and credentials remain in existing runtime storage. Preserve captured ontology selections during retries and downstream mappings. Saving an ontology candidate is separate from activation.
+
+## Evidence-backed ROI
+
+For a standard Persona app, include the domain ROI/Impact sidebar destination and connect it to the same landing calculator definitions via `publishedConfig.roiMonitoring`. Read [the ROI algorithm and evidence contract](../chat-app-builder/references/roi-evidence.md) or Gateway topic `persona-roi`: map committed output/List fields to the parent ontology, capture the semantic revision at execution, deduplicate stable identities, preserve acceptance/withdrawal boundaries and measure value with explicit runner baselines or evidenced economic rules. Credits/tokens/top-up funding are distinct; never sum them as one cost or call a budget/row count cash savings. Missing evidence/currency conversion keeps financial ROI unknown. Validate the model and real runner ROI before publication.
+
+Signals uses the shared panel’s inner Signals/Planning controls; never add or show a duplicate outer Signals/Routines tab strip. Scheduled and legacy routines remain in that panel’s existing controls. Meet/Coach tabs must prefix the label with the current persona portrait, even when an older model has a generic AI icon. Configure the actual persona avatar, not the author’s photo.
+
+ROI/Impact is sidebar-only. Use canonical `agents` (existing Kai `grocery-agents`) metadata as the standalone target; never display an ROI tab beside Meet/Coach.
+
+## Opt-in Super Connector location discovery
+
+`publishedConfig.peopleMatchingConfig.proximity` extends the existing matching feature.
+Omission or `enabled: false` preserves existing personas (including Juno). Enable only
+on a persona whose brief requests location discovery. Keep the full matching config;
+do not replace participant/match targets, pairings, portable list refs or profile modes.
+
+```json
+{"enabled":true,"provider":"google_maps","defaultRadiusMeters":2000,"maxRadiusMeters":20000,"latitudeField":"latitude","longitudeField":"longitude","radiusField":"radiusMeters","schoolField":"schoolId","schoolModeIds":["schools"]}
+```
+
+Author two `profileExperience.modes` when requested: `neighborhood` and `schools`.
+Use separate mode questions/navigation and a canonical school ID question for Schools.
+The active mode comes from the authenticated runner's profile, never a caller-supplied
+school or profile override. School IDs scope matching; they do not verify affiliation.
+Store only definitions in Git; location, visibility consent and school answers are runtime data.
+Do not seed real family locations or children’s identity/contact data in portable assets.
+
+Runner surfaces (all use the same enforcement):
+- Workspace MCP: `gabriel_search_nearby_people(pageId)` and
+  `gabriel_set_matching_geofence(pageId, latitude, longitude, radiusMeters)`.
+- Persona MCP: `persona_search_nearby_people()` and `persona_set_matching_geofence(...)`.
+- Gateway REST: `GET /api/gateway/pages/:pageId/people-matching/nearby` and
+  `PUT /api/gateway/pages/:pageId/people-matching/geofence`.
+- Persona REST: `GET /api/v1/matches/nearby`, `PUT /api/v1/matches/geofence`,
+  requiring `digital-twin:matches` and using the key's runner identity.
+- Signed-in web/mobile: `/api/v1/pages/:pageId/people-matching/nearby` and `/geofence`.
+
+A runner selects a location and radius on their active profile. Validate numeric
+coordinates, radius >=100 m and <=the persona maximum (hard cap 50 km). Missing or
+invalid coordinates fail closed. Filter with an exact great-circle distance after
+the database bounding box. School mode also requires the same non-empty school ID;
+profile modes never mix. Return only completed, explicitly visible profiles and
+approximate pins, without contact details or exact home coordinates. Apply the same
+rules to direct proposals, reactive matching, periodic scoring and shared-pool tool
+queries. Existing double opt-in introduction/scheduling gates remain authoritative.
+
+Google Maps configuration is always per persona. Configure it on Edit Persona →
+Super Connector → Google Maps, or Publish App → Persona Apps. Never instruct the
+user to put Maps keys or a Maps feature flag in a build environment. The shared
+editor saves encrypted web/Android/iOS keys and map ID outside portable Git.
+
+Author-only MCP: `gabriel_get_persona_maps_config` and
+`gabriel_update_persona_maps_config` (`pageId`, optional `webApiKey`,
+`androidApiKey`, `iosApiKey`, `mapId`), requiring `digital-twin:admin`.
+GET/PUT `/api/gateway/pages/:pageId/maps-config` expose status/fingerprints and
+save keys. Blank key inputs preserve current credentials. Runner discovery reads
+only the chosen persona's settings; it cannot change author credentials.
+
+Branded app manifest: `integrations.googleMaps = { enabled: true,
+configurationSource: "persona" }`. This portable setting contains no raw key.
+The publishing pipeline resolves saved persona settings into its native packaging
+snapshot and stamps Android SDK metadata and iOS Info.plist automatically. Local
+packaging resolves the same author-only `/maps-config/runtime` endpoint with the
+existing Gabriel account authentication; it does not accept Maps environment keys.
+Publish an updated mobile package after changing native SDK keys. SDK metadata is
+checked through the native persona Maps bridge, not a Dart environment flag.
+Web uses an isolated per-persona map frame so SPA navigation cannot reuse a different
+persona's Google key. Match visibility, geofence and school gates remain server-owned.
+Keep raw keys out of portable repositories, public landing repos, logs and prompts.
+
+Required checks: disabled-feature compatibility, missing/invalid coordinates,
+outside/boundary radius, antimeridian/poles, cross-mode/cross-school exclusion,
+visibility revocation, runner isolation, map mobile layout, and API/MCP parity.
