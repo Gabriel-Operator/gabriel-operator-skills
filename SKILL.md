@@ -12,6 +12,11 @@ metadata:
 
 # Gabriel Operator Gateway Skill
 
+## Slash-command governance and cost handoff
+
+Read [command governance](references/command-governance.md) before authoring or running a slash command. Use `gabriel_get_command_governance`, `gabriel_validate_command_governance`, and `gabriel_estimate_command_cost`; include coverage warnings, the effective preset, selected models, estimated USD spend, Gabriel credits, and unknown components in the handoff. Authoring findings warn; irreversible effects still require runtime human approval. Authors may configure optional reviewers but cannot disable authorization, exact-effect approval, or durable audit. Use `gabriel_get_governance_run` and `gabriel_list_governance_events` to inspect evidence; `gabriel_request_action_approval` returns a human review link and never grants approval.
+
+
 ## Offline-first environment
 
 Read [the embedded runtime contract](references/offline-runtime-v1.md) before choosing an API. Discover the active environment and its capability report first. In embedded local mode, use device repositories and local execution adapters; do not silently switch to the gateway when a step is blocked. Explain that synchronization is manual and identify which requested effects still need connectivity.
@@ -327,6 +332,9 @@ For git-backed list definition edits, use the `list-builder` skill after the
 gateway confirms the list and repository context.
 
 ## Asset Library Rules
+
+For media jobs, drafts, rendering and paired execution, read
+[Media MCP and paired execution](references/media-execution.md).
 
 Use `gabriel_list_assets` to search or inspect media assets.
 
