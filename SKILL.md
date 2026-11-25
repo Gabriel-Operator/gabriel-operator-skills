@@ -7,8 +7,12 @@ description: >
   specialized git-backed skills.
 metadata:
   author: gabriel-operator
-  version: "1.3.1"
+  version: "1.3.3"
 ---
+
+# Personal MCP connector apps in Studio
+
+Load skill topic **connector-app-builder** when someone wants an additional app in Studio → Apps → My apps. It builds from discovered remote MCP tools and schemas, generates a custom UI or uses a provider UI, previews fixtures, registers an immutable private revision and installs it in an authorized team. Use account-level `studio-apps:read` / `studio-apps:write`; no platform checkout or `digital-twin:admin` is required. Private definitions, UI and connections never become team-shared. Only explicitly mapped task fields and accepted outputs enter shared work. Owner activation is required for automatic reactive bots. Public catalog definitions remain platform-maintained and persona template app cards retain their existing behavior. When building a persona, choose its Studio apps and Featured market layers with the persona-builder skill's app plan (skill topics `studio-apps` and `featured-app-layers`); build a private app here only for a service a team must connect that has no public connection.
 
 # Gabriel Operator Gateway Skill
 ## Persona operating framework
@@ -33,6 +37,17 @@ Read [command governance](references/command-governance.md) before authoring or 
 
 Read [the embedded runtime contract](references/offline-runtime-v1.md) before choosing an API. Discover the active environment and its capability report first. In embedded local mode, use device repositories and local execution adapters; do not silently switch to the gateway when a step is blocked. Explain that synchronization is manual and identify which requested effects still need connectivity.
 
+## Public persona links
+
+For user-facing handoff, use the `publicUrl` returned by `gabriel_create_page`,
+`gabriel_publish_twin`, `gabriel_update_page_profile` or the persona entry in
+`gabriel_list_resources`. Its canonical route is `/persona/<slug>`, for example
+`https://gabrieloperator.com/persona/victor`. Use the saved `pageSlug`, never a
+database id, in public links. A null `publicUrl` means the author must choose and
+save a human-readable `pageSlug` through `gabriel_update_page_profile`; do not
+invent a fallback URL. Page ids remain valid API lookup parameters. Report a
+persona as published only after its publish operation succeeds.
+
 ## Goal
 
 Use the Gabriel Operator gateway as the first control plane for a user's workspace.
@@ -52,6 +67,18 @@ but the gateway is the unified runtime/API entrypoint.
 To **create** a new AI Persona from a description (page, lists, pipeline,
 workflows, git, team agents, publish), use the `persona-builder` skill. Request
 it with `gabriel_get_skill_instructions` and topic `persona-builder`.
+
+For a public landing page, request topic `landing-page-builder`. Its `references`
+include the JSON catalog of all 15 existing templates, the full landing contract
+and a template/identity guide. Honor a selected template or recommend one when
+asked, state its name and ID in the plan, and save `landingPage.design.variant`.
+The Docs and Dashboard quickstart template picker includes this choice in the
+copied prompt. Create the new persona's own character, portrait, separate logo and
+supporting artwork with the connected generation tool, then host/register the real
+results with `gabriel_upload_asset` or `gabriel_save_asset`. These asset tools do
+not generate images. Follow [the MCP Gateway reference](references/MCP-GATEWAY.md#landing-templates-and-original-character-artwork)
+for the response paths, asset wiring and validation; do not reuse the reference
+persona's identity or commands.
 
 To edit the Persona's semantic entity/attribute/relationship contract, request topic `persona-ontology` (alias `ontology`). It maintains the parent app's single `assets/ontology.json` and validates Data Feed references without migrating runtime rows or replacing state machines.
 
@@ -76,7 +103,7 @@ Use only the scopes needed for the task:
 | `mcp:access` | MCP gateway connection. |
 | `digital-twin:chat` | Chat with an AI Persona. |
 | `digital-twin:tools` | Let an AI Persona use its configured tools. |
-| `digital-twin:admin` | Create and configure personas, lists, pipelines, git bindings, and team agents. |
+| `digital-twin:admin` | Persona Playground author token only: create and configure shared persona templates, lists, pipelines, git bindings, and team agents. Workspace keys cannot carry this scope. |
 | `digital-twin:media` | List, save, or delete media assets. |
 | `automation:read` | List AI operators and read run status. |
 | `automation:run` | Start AI operator runs. |
@@ -461,9 +488,15 @@ Use `gabriel_list_integrations` to discover actual capabilities and workspace ro
 
 ## Persona app composition discovery
 
-When building or revising a signed-in Persona app, request child topics `chat-app-builder` and `persona-chat-app-layout` through `gabriel_get_skill_instructions` (REST: `/api/gateway/skill-instructions?topic=...`). Use a Home dashboard with a review-only Meet Persona coach and domain records/results/decisions, plus the standard minimal sidebar. Playbooks is sidebar-only, milestones/goals lives in Coach, and routines/Signals/Schedule lives in Signals. Never duplicate those as Home tabs or panels. Patch the complete validated `chatApp`, mirror `assets/chat-app.json` and `publishedConfig.chatApp`, then use workspace publication. Do not treat the public landing page or a slash command as the full authenticated app.
+When building or revising a signed-in Persona app, request child topics `chat-app-builder` and `persona-chat-app-layout` through `gabriel_get_skill_instructions` (REST: `/api/gateway/skill-instructions?topic=...`). New pages already save an enabled schema-version-3 Chat App starter with Home, Playbooks, Signals, Data Feed and Media. Enrich its real domain records/results/decision views and command bindings. Home uses a domain or Activity default tab; the review-only Coach opens through the shared floating chat/right sidebar, without a duplicate inline Meet/coach tab. Playbooks is sidebar-only, milestones/goals lives in Coach, and routines/Signals/Schedule lives in Signals. Never duplicate those as Home tabs or panels. Patch the complete validated `chatApp`, mirror `assets/chat-app.json` and `publishedConfig.chatApp`, then use workspace publication. Do not treat the public landing page or a slash command as the full authenticated app.
 
 ## Context-aware ontology
+
+For a Google Maps-like organization/process/playbook view in a new or existing
+Persona, request `persona-organization-map` (alias `organization-map`). It authors
+the optional `chatApp.organizationMap` JSON hierarchy, binds processes to registered
+command actions, and uses the shared web header and playbook list/map switch.
+It is a conceptual business map and requires no geographic Maps service.
 
 Use the parent persona’s `assets/ontology.json` for Global → country/region → one authenticated audience → language → terminology. Refer to [the ontology skill](../persona-ontology/SKILL.md) for snapshots, stable IDs, validation, preview and gateway/MCP authoring. Child resources reference that contract; stored instances and credentials remain in existing runtime storage. Preserve captured ontology selections during retries and downstream mappings. Saving an ontology candidate is separate from activation.
 
@@ -517,9 +550,15 @@ Super Connector → Google Maps, or Publish App → Persona Apps. Never instruct
 user to put Maps keys or a Maps feature flag in a build environment. The shared
 editor saves encrypted web/Android/iOS keys and map ID outside portable Git.
 
+Studio apps registry (author-only, `digital-twin:admin`): `gabriel_list_studio_apps`
+reads the platform app registry, the app templates and the author's saved apps;
+`gabriel_register_studio_app` (`name`, `app`, optional `sourcePageId`) saves an app
+definition the author's other personas can start from. See the persona-builder skill's
+`references/studio-apps.md`.
+
 Author-only MCP: `gabriel_get_persona_maps_config` and
 `gabriel_update_persona_maps_config` (`pageId`, optional `webApiKey`,
-`androidApiKey`, `iosApiKey`, `mapId`), requiring `digital-twin:admin`.
+`androidApiKey`, `iosApiKey`, `mapId`), requiring the Persona Playground author token with `digital-twin:admin`.
 GET/PUT `/api/gateway/pages/:pageId/maps-config` expose status/fingerprints and
 save keys. Blank key inputs preserve current credentials. Runner discovery reads
 only the chosen persona's settings; it cannot change author credentials.
@@ -539,3 +578,9 @@ Keep raw keys out of portable repositories, public landing repos, logs and promp
 Required checks: disabled-feature compatibility, missing/invalid coordinates,
 outside/boundary radius, antimeridian/poles, cross-mode/cross-school exclusion,
 visibility revocation, runner isolation, map mobile layout, and API/MCP parity.
+
+## Git-managed Studio teams
+
+Request skill topic **persona-team-manager** to export, preview and commit workspace team definitions and register either **Build from steps** or **Plan from a goal**. The downloadable pack includes the shared schema, offline validator, authenticated helpers and Lane reference model. Registration is distinct from starting a run. Keep personal connections private and shared app publishing separately granted. Do not use persona-author publication tools for ordinary workspace playbooks.
+
+For team setup, use **Team Quick Start** and browser sign-in or a workspace key with a chosen expiry (one hour by default), scoped to the selected persona and workspace. Playbook creation, editing and placement belong to the **Canvas library panel**, not a separate team Playbooks tab. Writers can prepare definitions using the team key; owner activation, account sign-in and effect approvals remain in their authenticated flows. Never request the persona author’s token. **Try with Agents** reopens Quick Start. Manage or revoke your assistant sign-ins and keys in **App access**.
